@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import Nav from '../components/Nav';
-import { loadCachedPicks, fetchAndCacheAllSports, timeSinceUpdate, getActiveSports } from '../lib/oddsApi';
-
-const ODDS_API_KEY = '1ad6289c29935840d01c48d6e9438cb9';
 
 export default function DailyPicks() {
   const [picks, setPicks] = useState([]);
@@ -10,57 +7,40 @@ export default function DailyPicks() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [bankroll, setBankroll] = useState(1000);
   const [unitSize, setUnitSize] = useState(50);
-  const [apiCallsRemaining, setApiCallsRemaining] = useState(null);
   const [sportsChecked, setSportsChecked] = useState([]);
-  const [manualFetchCount, setManualFetchCount] = useState(0);
 
   useEffect(() => {
     const savedBankroll = localStorage.getItem('bankroll');
     const savedUnit = localStorage.getItem('unitSize');
-    const savedFetchCount = localStorage.getItem('manualFetchCount');
-    
     if (savedBankroll) setBankroll(parseFloat(savedBankroll));
     if (savedUnit) setUnitSize(parseFloat(savedUnit));
-    if (savedFetchCount) setManualFetchCount(parseInt(savedFetchCount));
     
-    // Load cached picks on mount
     loadPicks();
   }, []);
 
-  function loadPicks() {
-    const cached = loadCachedPicks();
-    if (cached) {
-      setPicks(cached.picks);
-      setLastUpdated(cached.timestamp);
-      setSportsChecked(cached.sportsChecked || []);
-    } else {
-      // No cached data yet
-      setPicks([]);
-      setLastUpdated(null);
-    }
-    setLoading(false);
-  }
-
-  async function manualRefresh() {
-    // Warn about API usage
-    if (manualFetchCount >= 3) {
-      alert('Warning: You\'ve manually refreshed 3 times today. Each refresh uses API calls from your 500/month quota. The system auto-updates twice daily (10 AM and 5 PM).');
-    }
-    
+  async function loadPicks() {
     setLoading(true);
     try {
-      const result = await fetchAndCacheAllSports(ODDS_API_KEY);
-      setPicks(result.picks);
-      setLastUpdated(result.timestamp);
-      setSportsChecked(result.sportsChecked);
-      
-      // Track manual fetches
-      const newCount = manualFetchCount + 1;
-      setManualFetchCount(newCount);
-      localStorage.setItem('manualFetchCount', newCount.toString());
+      // Fetch from static JSON file (updated by cron job)
+      const response = await fetch('/data/picks.json');
+      if (response.ok) {
+        const data = await response.json();
+        setPicks(data.picks || []);
+        setLastUpdated(data.timestamp);
+        setSportsChecked(data.sportsChecked || []);
+      } else {
+        // Fallback to localStorage cache
+        const cached = localStorage.getItem('cachedPicks');
+        if (cached) {
+          const data = JSON.parse(cached);
+          setPicks(data.picks || []);
+          setLastUpdated(data.timestamp);
+          setSportsChecked(data.sportsChecked || []);
+        }
+      }
     } catch (e) {
-      console.error('Fetch error:', e);
-      alert('Failed to fetch fresh data. Using cached picks if available.');
+      console.error('Failed to load picks:', e);
+      setPicks([]);
     } finally {
       setLoading(false);
     }
@@ -78,32 +58,41 @@ export default function DailyPicks() {
     });
   };
 
+  const timeSince = (dateStr) => {
+    if (!dateStr) return 'Never';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const hours = Math.floor(diff / 3600000);
+    const mins = Math.floor(diff / 60000);
+    if (mins < 5) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours/24)}d ago`;
+  };
+
   const totalRisk = picks.reduce((sum, p) => sum + (p.units * unitSize), 0);
-  const activeSports = getActiveSports();
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
       <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <h1>📋 Roci's Daily Picks</h1>
-        <p style={{ color: '#666' }}>Auto-updates at 10 AM & 5 PM ET • {timeSinceUpdate(lastUpdated)}</p>
+        <p style={{ color: '#666' }}>Auto-updates at 10 AM & 5 PM ET • {timeSince(lastUpdated)}</p>
       </header>
 
       <Nav />
 
-      {/* API Usage Warning */}
+      {/* API Info */}
       <div style={{ 
-        background: '#fff3e0', 
+        background: '#e8f5e9', 
         padding: '15px', 
         borderRadius: '8px', 
         marginBottom: '20px',
         fontSize: '14px'
       }}>
-        <strong>📊 API Usage:</strong> Free tier = 500 requests/month. 
-        System auto-fetches 8 sports × 2 times daily = ~480 requests/month. 
-        Manual refreshes count against quota (used {manualFetchCount} today).
+        <strong>✅ System Optimized:</strong> Fetches 8 sports × 2× daily = ~480 API calls/month (within 500 free tier limit). 
+        Data refreshes automatically at 10:00 AM and 5:00 PM ET.
       </div>
 
-      {/* Bankroll Status */}
+      {/* Bankroll */}
       <div style={{ 
         background: '#e3f2fd', 
         padding: '20px', 
@@ -122,53 +111,31 @@ export default function DailyPicks() {
           <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>${unitSize}</p>
         </div>
         <div>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Today's Risk</p>
+          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Risk Today</p>
           <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: totalRisk > unitSize * 3 ? '#f44336' : '#4caf50' }}>
             ${totalRisk.toFixed(2)}
           </p>
         </div>
         <div>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Active Picks</p>
+          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Picks</p>
           <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{picks.length}</p>
         </div>
       </div>
 
-      {/* Sports Tracked */}
-      <div style={{ marginBottom: '20px' }}>
-        <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '14px' }}>
-          <strong>Tracking {activeSports.length} sports:</strong> {activeSports.map(s => s.name).join(', ')}
-        </p>
-        {sportsChecked.length > 0 && (
-          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
-            Last scan checked: {sportsChecked.join(', ')}
+      {sportsChecked.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>
+            <strong>Analyzed {sportsChecked.length} sports:</strong> {sportsChecked.join(', ')}
           </p>
-        )}
-      </div>
-
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <button 
-          onClick={manualRefresh}
-          disabled={loading}
-          style={{
-            padding: '10px 20px',
-            background: loading ? '#999' : '#4caf50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Loading...' : '🔄 Manual Refresh'}
-        </button>
-        <span style={{ color: '#666', fontSize: '12px' }}>
-          Auto-refreshes: 10:00 AM & 5:00 PM ET
-        </span>
-      </div>
+          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
+            Last updated: {formatDate(lastUpdated)}
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>
-          <p>Analyzing lines across {activeSports.length} sports...</p>
-          <p style={{ color: '#666', fontSize: '14px' }}>Calculating expected value and ranking plays</p>
+          <p>Loading picks...</p>
         </div>
       ) : picks.length === 0 ? (
         <div style={{ 
@@ -179,19 +146,13 @@ export default function DailyPicks() {
         }}>
           <h2>No picks available</h2>
           <p style={{ color: '#666' }}>
-            The system updates automatically at 10 AM and 5 PM ET.<br/>
-            Check back after the next scheduled update, or click Manual Refresh.
+            System updates at 10:00 AM and 5:00 PM ET daily.<br/>
+            Check back after the next scheduled update.
           </p>
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: '20px' }}>
-            <h2>Top Plays from {sportsChecked.length} Sports</h2>
-            <p style={{ color: '#666', fontSize: '14px' }}>
-              Auto-generated from DraftKings odds • Last updated: {formatDate(lastUpdated)}
-            </p>
-          </div>
-
+          <h2>Top Value Plays</h2>
           <div style={{ display: 'grid', gap: '15px' }}>
             {picks.map((pick, i) => (
               <div key={i} style={{
@@ -213,7 +174,7 @@ export default function DailyPicks() {
                       color: pick.confidence === 'high' ? '#4caf50' : pick.confidence === 'medium' ? '#ff9800' : '#f44336',
                       marginBottom: '8px'
                     }}>
-                      #{i + 1} {pick.sport} • {pick.confidence.toUpperCase()} CONFIDENCE
+                      #{i + 1} {pick.sport} • {pick.confidence.toUpperCase()}
                     </span>
                     <h3 style={{ margin: '0 0 5px 0' }}>{pick.pick}</h3>
                     <p style={{ margin: 0, color: '#666' }}>{pick.game}</p>
@@ -234,12 +195,7 @@ export default function DailyPicks() {
                   </div>
                 </div>
 
-                <div style={{ 
-                  background: '#f5f5f5', 
-                  padding: '15px', 
-                  borderRadius: '6px',
-                  marginTop: '15px'
-                }}>
+                <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '6px', marginTop: '15px' }}>
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Analysis</h4>
                   <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6' }}>{pick.analysis}</p>
                 </div>
@@ -249,24 +205,17 @@ export default function DailyPicks() {
         </>
       )}
 
-      <div style={{ 
-        background: '#ffebee', 
-        padding: '20px', 
-        borderRadius: '8px', 
-        marginTop: '30px' 
-      }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>⚠️ Responsible Betting Reminder</h3>
+      <div style={{ background: '#ffebee', padding: '20px', borderRadius: '8px', marginTop: '30px' }}>
+        <h3 style={{ margin: '0 0 10px 0' }}>⚠️ Responsible Betting</h3>
         <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>
           <li>Only bet what you can afford to lose</li>
-          <li>Set a stop-loss and stick to it</li>
-          <li>Never chase losses</li>
           <li>Track every bet in the <a href="/tracker" style={{ color: '#2196f3' }}>Tracker</a></li>
-          <li>If it's not fun, stop immediately</li>
+          <li>Set a stop-loss and stick to it</li>
         </ul>
       </div>
 
       <footer style={{ borderTop: '1px solid #ccc', paddingTop: '20px', marginTop: '30px', color: '#666', fontSize: '14px', textAlign: 'center' }}>
-        <p>🚀 Picks auto-generated via The Odds API • Live DraftKings lines</p>
+        <p>🚀 Auto-generated via The Odds API • DraftKings lines • Updates 2× daily</p>
         <p style={{ fontSize: '12px' }}>Not financial advice. For entertainment purposes only.</p>
       </footer>
     </div>
