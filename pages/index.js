@@ -26,26 +26,34 @@ export default function DailyPicks() {
   async function loadPicks() {
     setLoading(true);
     try {
-      // Fetch from static JSON file (updated by cron job)
-      const response = await fetch('/data/picks.json');
+      // Try to fetch from public/data/picks.json
+      let response = await fetch('/data/picks.json');
+      
+      // If that fails, try the data folder
+      if (!response.ok) {
+        response = await fetch('./data/picks.json');
+      }
+      
       if (response.ok) {
         const data = await response.json();
         setPicks(data.picks || []);
         setLastUpdated(data.timestamp);
         setSportsChecked(data.sportsChecked || []);
       } else {
-        // Fallback to localStorage cache
-        const cached = localStorage.getItem('cachedPicks');
-        if (cached) {
-          const data = JSON.parse(cached);
-          setPicks(data.picks || []);
-          setLastUpdated(data.timestamp);
-          setSportsChecked(data.sportsChecked || []);
-        }
+        throw new Error('Failed to load data file');
       }
     } catch (e) {
       console.error('Failed to load picks:', e);
-      setPicks([]);
+      // Fallback to localStorage cache
+      const cached = localStorage.getItem('cachedPicks');
+      if (cached) {
+        const data = JSON.parse(cached);
+        setPicks(data.picks || []);
+        setLastUpdated(data.timestamp);
+        setSportsChecked(data.sportsChecked || []);
+      } else {
+        setPicks([]);
+      }
     } finally {
       setLoading(false);
     }
