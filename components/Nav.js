@@ -6,34 +6,38 @@ export default function Nav() {
   
   const navStyle = {
     display: 'flex',
-    gap: '10px',
-    padding: '10px 0',
-    marginBottom: '30px',
-    borderBottom: '2px solid #eee',
+    gap: '8px',
+    padding: '12px 0',
+    marginBottom: '40px',
+    borderBottom: '1px solid rgba(0, 243, 255, 0.2)',
     flexWrap: 'wrap',
   };
   
   const linkStyle = (active) => ({
-    color: active ? '#2196f3' : '#666',
+    color: active ? '#00f3ff' : '#8892b0',
     textDecoration: 'none',
     fontWeight: active ? '600' : '400',
-    padding: '10px 20px',
+    padding: '12px 24px',
     borderRadius: '8px',
-    background: active ? '#e3f2fd' : 'transparent',
-    fontSize: '15px',
-    transition: 'all 0.2s',
+    background: active ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+    fontSize: '14px',
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+    border: active ? '1px solid rgba(0, 243, 255, 0.3)' : '1px solid transparent',
+    transition: 'all 0.3s ease',
+    fontFamily: 'monospace',
   });
 
   return (
     <nav style={navStyle}>
       <Link href="/" style={linkStyle(router.pathname === '/')}>
-        📋 Daily Picks
+        Daily Picks
       </Link>
       <Link href="/tracker" style={linkStyle(router.pathname === '/tracker')}>
-        📊 Tracker
+        Tracker
       </Link>
       <Link href="/strategy" style={linkStyle(router.pathname === '/strategy')}>
-        📖 Strategy
+        Strategy
       </Link>
     </nav>
   );

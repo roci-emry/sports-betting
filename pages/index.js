@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Nav from '../components/Nav';
-import { getTrackedSports, getSportsScheduleInfo } from '../lib/oddsApi';
+import { getTrackedSports } from '../lib/oddsApi';
 
 export default function DailyPicks() {
   const [picks, setPicks] = useState([]);
@@ -17,22 +17,15 @@ export default function DailyPicks() {
     if (savedBankroll) setBankroll(parseFloat(savedBankroll));
     if (savedUnit) setUnitSize(parseFloat(savedUnit));
     
-    // Set tracked sports for display
     setTrackedSports(getTrackedSports());
-    
     loadPicks();
   }, []);
 
   async function loadPicks() {
     setLoading(true);
     try {
-      // Try to fetch from public/data/picks.json
       let response = await fetch('/data/picks.json');
-      
-      // If that fails, try the data folder
-      if (!response.ok) {
-        response = await fetch('./data/picks.json');
-      }
+      if (!response.ok) response = await fetch('./data/picks.json');
       
       if (response.ok) {
         const data = await response.json();
@@ -43,8 +36,6 @@ export default function DailyPicks() {
         throw new Error('Failed to load data file');
       }
     } catch (e) {
-      console.error('Failed to load picks:', e);
-      // Fallback to localStorage cache
       const cached = localStorage.getItem('cachedPicks');
       if (cached) {
         const data = JSON.parse(cached);
@@ -84,145 +75,291 @@ export default function DailyPicks() {
 
   const totalRisk = picks.reduce((sum, p) => sum + (p.units * unitSize), 0);
 
+  const confidenceColor = (conf) => {
+    if (conf === 'high') return '#00f3ff';
+    if (conf === 'medium') return '#ff6b35';
+    return '#e94560';
+  };
+
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
-      <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-        <h1>📋 Roci's Daily Picks</h1>
-        <p style={{ color: '#666' }}>Auto-updates at 10 AM & 5 PM ET • {timeSince(lastUpdated)}</p>
+    <div style={{
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      maxWidth: '1000px',
+      margin: '0 auto',
+      padding: '40px 20px',
+      background: '#0a0e27',
+      minHeight: '100vh',
+      color: '#ccd6f6'
+    }}>
+      <header style={{ 
+        borderBottom: '1px solid rgba(0, 243, 255, 0.2)',
+        paddingBottom: '30px',
+        marginBottom: '30px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #00f3ff 0%, #0066ff 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px'
+          }}>
+            ◈
+          </div>
+          <div>
+            <h1 style={{ 
+              margin: 0, 
+              fontSize: '32px',
+              fontWeight: '700',
+              background: 'linear-gradient(90deg, #00f3ff, #0066ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.5px'
+            }}>
+              ROCi SPORTS
+            </h1>
+            <p style={{ margin: '5px 0 0 0', color: '#8892b0', fontSize: '14px', fontFamily: 'monospace' }}>
+              AUTOMATED BETTING INTELLIGENCE
+            </p>
+          </div>
+        </div>
+        <p style={{ margin: '10px 0 0 0', color: '#8892b0', fontSize: '13px', fontFamily: 'monospace' }}>
+          LAST UPDATE: {timeSince(lastUpdated).toUpperCase()} • NEXT: 10:00 & 17:00 ET
+        </p>
       </header>
 
       <Nav />
 
-      {/* API Info & Tracked Sports */}
+      {/* Stats Grid */}
       <div style={{ 
-        background: '#e8f5e9', 
-        padding: '15px', 
-        borderRadius: '8px', 
-        marginBottom: '20px',
-        fontSize: '14px'
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '20px',
+        marginBottom: '40px'
       }}>
-        <strong>✅ System Optimized:</strong> Fetches 8 sports × 2× daily = ~480 API calls/month (within 500 free tier limit). 
-        Data refreshes automatically at 10:00 AM and 5:00 PM ET.
-        
-        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #c8e6c9' }}>
-          <strong>Currently Tracking ({trackedSports.length} sports):</strong>{' '}
-          {trackedSports.map((s, i) => (
-            <span key={s.key}>
-              {s.name}{i < trackedSports.length - 1 ? ', ' : ''}
+        {[
+          { label: 'BANKROLL', value: `$${bankroll.toFixed(2)}`, color: '#00f3ff' },
+          { label: 'UNIT SIZE', value: `$${unitSize}`, color: '#64ffda' },
+          { label: 'TODAY\'S RISK', value: `$${totalRisk.toFixed(2)}`, color: totalRisk > unitSize * 3 ? '#e94560' : '#00f3ff' },
+          { label: 'ACTIVE PICKS', value: picks.length, color: '#bd34fe' },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            background: 'rgba(10, 25, 47, 0.7)',
+            padding: '25px',
+            borderRadius: '16px',
+            border: '1px solid rgba(0, 243, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: `linear-gradient(90deg, ${stat.color}, transparent)`
+            }} />
+            <p style={{ 
+              margin: '0 0 10px 0', 
+              color: '#8892b0', 
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              letterSpacing: '1px'
+            }}>
+              {stat.label}
+            </p>
+            <p style={{ 
+              margin: 0, 
+              fontSize: '28px', 
+              fontWeight: '700',
+              color: stat.color,
+              fontFamily: 'monospace'
+            }}>
+              {stat.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Tracked Sports */}
+      <div style={{
+        background: 'rgba(10, 25, 47, 0.5)',
+        padding: '20px 25px',
+        borderRadius: '12px',
+        border: '1px solid rgba(0, 243, 255, 0.1)',
+        marginBottom: '30px'
+      }}>
+        <p style={{ margin: '0 0 10px 0', color: '#8892b0', fontSize: '12px', fontFamily: 'monospace' }}>
+          TRACKING {trackedSports.length} SPORTS
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          {trackedSports.map((sport, i) => (
+            <span key={sport.key} style={{
+              padding: '8px 16px',
+              borderRadius: '20px',
+              background: 'rgba(0, 243, 255, 0.1)',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              color: '#00f3ff',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              fontWeight: '500'
+            }}>
+              {sport.name.toUpperCase()}
             </span>
           ))}
         </div>
-        <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#666' }}>
-          Sports rotate based on season. Priority: NBA, NHL, NCAAB, Soccer, Tennis, MLB, Football (when active), with alternates filling gaps.
-        </p>
       </div>
-
-      {/* Bankroll */}
-      <div style={{ 
-        background: '#e3f2fd', 
-        padding: '20px', 
-        borderRadius: '8px', 
-        marginBottom: '30px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: '20px'
-      }}>
-        <div>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Bankroll</p>
-          <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>${bankroll.toFixed(2)}</p>
-        </div>
-        <div>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Unit Size</p>
-          <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>${unitSize}</p>
-        </div>
-        <div>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Risk Today</p>
-          <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: totalRisk > unitSize * 3 ? '#f44336' : '#4caf50' }}>
-            ${totalRisk.toFixed(2)}
-          </p>
-        </div>
-        <div>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>Picks</p>
-          <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{picks.length}</p>
-        </div>
-      </div>
-
-      {sportsChecked.length > 0 && (
-        <div style={{ marginBottom: '20px' }}>
-          <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '14px' }}>
-            <strong>Analyzed {sportsChecked.length} sports:</strong> {sportsChecked.join(', ')}
-          </p>
-          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
-            Last updated: {formatDate(lastUpdated)}
-          </p>
-        </div>
-      )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <p>Loading picks...</p>
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '60px',
+          background: 'rgba(10, 25, 47, 0.5)',
+          borderRadius: '20px',
+          border: '1px solid rgba(0, 243, 255, 0.1)'
+        }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '3px solid rgba(0, 243, 255, 0.1)',
+            borderTop: '3px solid #00f3ff',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <p style={{ color: '#00f3ff', fontFamily: 'monospace' }}>ANALYZING MARKETS...</p>
+          <p style={{ color: '#8892b0', fontSize: '13px' }}>Scanning {trackedSports.length} sports for +EV plays</p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       ) : picks.length === 0 ? (
         <div style={{ 
-          background: '#fff3e0', 
-          padding: '30px', 
-          borderRadius: '8px', 
-          textAlign: 'center' 
+          background: 'rgba(10, 25, 47, 0.5)',
+          padding: '50px',
+          borderRadius: '20px',
+          border: '1px solid rgba(0, 243, 255, 0.1)',
+          textAlign: 'center'
         }}>
-          <h2>No picks available</h2>
-          <p style={{ color: '#666' }}>
-            System updates at 10:00 AM and 5:00 PM ET daily.<br/>
-            Check back after the next scheduled update.
+          <p style={{ color: '#00f3ff', fontSize: '18px', marginBottom: '10px' }}>NO PICKS AVAILABLE</p>
+          <p style={{ color: '#8892b0', fontSize: '14px' }}>
+            System updates at 10:00 & 17:00 ET daily
           </p>
         </div>
       ) : (
         <>
-          <h2>Top Value Plays</h2>
-          <div style={{ display: 'grid', gap: '15px' }}>
+          <h2 style={{ 
+            color: '#ccd6f6',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            letterSpacing: '2px',
+            marginBottom: '25px',
+            textTransform: 'uppercase'
+          }}>
+            Top Value Opportunities
+          </h2>
+          
+          <div style={{ display: 'grid', gap: '20px' }}>
             {picks.map((pick, i) => (
               <div key={i} style={{
-                background: 'white',
-                padding: '20px',
-                borderRadius: '8px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                borderLeft: `4px solid ${pick.confidence === 'high' ? '#4caf50' : pick.confidence === 'medium' ? '#ff9800' : '#f44336'}`
+                background: 'linear-gradient(135deg, rgba(10, 25, 47, 0.9) 0%, rgba(17, 34, 64, 0.9) 100%)',
+                padding: '30px',
+                borderRadius: '20px',
+                border: `1px solid ${confidenceColor(pick.confidence)}40`,
+                position: 'relative',
+                overflow: 'hidden',
+                backdropFilter: 'blur(10px)'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                {/* Glow effect */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: `linear-gradient(90deg, ${confidenceColor(pick.confidence)}, transparent)`
+                }} />
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                   <div>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      background: pick.confidence === 'high' ? '#e8f5e9' : pick.confidence === 'medium' ? '#fff3e0' : '#ffebee',
-                      color: pick.confidence === 'high' ? '#4caf50' : pick.confidence === 'medium' ? '#ff9800' : '#f44336',
-                      marginBottom: '8px'
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <span style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        fontFamily: 'monospace',
+                        background: `${confidenceColor(pick.confidence)}20`,
+                        color: confidenceColor(pick.confidence),
+                        border: `1px solid ${confidenceColor(pick.confidence)}40`,
+                        letterSpacing: '1px'
+                      }}>
+                        {pick.confidence.toUpperCase()}
+                      </span>
+                      <span style={{ color: '#8892b0', fontSize: '12px', fontFamily: 'monospace' }}>
+                        {pick.sport.toUpperCase()}
+                      </span>
+                    </div>
+                    <h3 style={{ 
+                      margin: '0 0 8px 0', 
+                      fontSize: '24px',
+                      color: '#ccd6f6',
+                      fontWeight: '600'
                     }}>
-                      #{i + 1} {pick.sport} • {pick.confidence.toUpperCase()}
-                    </span>
-                    <h3 style={{ margin: '0 0 5px 0' }}>{pick.pick}</h3>
-                    <p style={{ margin: 0, color: '#666' }}>{pick.game}</p>
+                      {pick.pick}
+                    </h3>
+                    <p style={{ margin: 0, color: '#8892b0', fontSize: '14px' }}>
+                      {pick.game}
+                    </p>
                   </div>
+                  
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ margin: '0 0 5px 0', fontSize: '24px', fontWeight: 'bold' }}>
+                    <p style={{ 
+                      margin: '0 0 8px 0', 
+                      fontSize: '36px', 
+                      fontWeight: '700',
+                      color: '#00f3ff',
+                      fontFamily: 'monospace'
+                    }}>
                       {pick.odds > 0 ? '+' : ''}{pick.odds}
                     </p>
-                    <p style={{ margin: 0, color: '#666' }}>{pick.units} units</p>
-                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#999' }}>
-                      ${(pick.units * unitSize).toFixed(0)}
-                    </p>
-                    {pick.ev !== undefined && (
-                      <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: pick.ev > 0 ? '#4caf50' : '#666' }}>
-                        EV: {(pick.ev * 100).toFixed(1)}%
-                      </p>
-                    )}
+                    <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', color: '#8892b0', fontSize: '10px', fontFamily: 'monospace' }}>UNITS</p>
+                        <p style={{ margin: 0, color: '#ccd6f6', fontSize: '16px', fontWeight: '600' }}>{pick.units}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', color: '#8892b0', fontSize: '10px', fontFamily: 'monospace' }}>STAKE</p>
+                        <p style={{ margin: 0, color: '#00f3ff', fontSize: '16px', fontWeight: '600' }}>
+                          ${(pick.units * unitSize).toFixed(0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', color: '#8892b0', fontSize: '10px', fontFamily: 'monospace' }}>EV</p>
+                        <p style={{ margin: 0, color: pick.ev > 0 ? '#00f3ff' : '#e94560', fontSize: '16px', fontWeight: '600' }}>
+                          +{(pick.ev * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '6px', marginTop: '15px' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Analysis</h4>
-                  <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6' }}>{pick.analysis}</p>
+                <div style={{ 
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(0, 243, 255, 0.1)'
+                }}>
+                  <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.7', color: '#a8b2d1' }}>
+                    {pick.analysis}
+                  </p>
                 </div>
               </div>
             ))}
@@ -230,18 +367,41 @@ export default function DailyPicks() {
         </>
       )}
 
-      <div style={{ background: '#ffebee', padding: '20px', borderRadius: '8px', marginTop: '30px' }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>⚠️ Responsible Betting</h3>
-        <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>
-          <li>Only bet what you can afford to lose</li>
-          <li>Track every bet in the <a href="/tracker" style={{ color: '#2196f3' }}>Tracker</a></li>
+      {/* Warning */}
+      <div style={{ 
+        background: 'rgba(233, 69, 96, 0.1)',
+        padding: '25px',
+        borderRadius: '16px',
+        border: '1px solid rgba(233, 69, 96, 0.3)',
+        marginTop: '40px'
+      }}>
+        <h3 style={{ margin: '0 0 15px 0', color: '#e94560', fontSize: '14px', fontFamily: 'monospace', letterSpacing: '1px' }}>
+          ⚠ RESPONSIBLE BETTING PROTOCOL
+        </h3>
+        <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '2', color: '#a8b2d1', fontSize: '14px' }}>
+          <li>Only bet what you can afford to lose completely</li>
           <li>Set a stop-loss and stick to it</li>
+          <li>Track every bet in the <a href="/tracker" style={{ color: '#00f3ff', textDecoration: 'none' }}>Tracker</a></li>
+          <li>If it's not fun, stop immediately</li>
         </ul>
       </div>
 
-      <footer style={{ borderTop: '1px solid #ccc', paddingTop: '20px', marginTop: '30px', color: '#666', fontSize: '14px', textAlign: 'center' }}>
-        <p>🚀 Auto-generated via The Odds API • DraftKings lines • Updates 2× daily</p>
-        <p style={{ fontSize: '12px' }}>Not financial advice. For entertainment purposes only.</p>
+      <footer style={{ 
+        borderTop: '1px solid rgba(0, 243, 255, 0.1)',
+        paddingTop: '30px',
+        marginTop: '40px',
+        color: '#8892b0',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        textAlign: 'center',
+        letterSpacing: '0.5px'
+      }}>
+        <p style={{ margin: '0 0 10px 0' }}>
+          ◈ ROCi SPORTS INTELLIGENCE ◈
+        </p>
+        <p style={{ margin: 0, opacity: 0.6 }}>
+          Automated EV Analysis via The Odds API • Not Financial Advice
+        </p>
       </footer>
     </div>
   );
