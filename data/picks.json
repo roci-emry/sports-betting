@@ -1,1 +1,70 @@
-{"picks": [], "timestamp": "", "sportsChecked": [], "message": "Waiting for first fetch"}
+{
+  "picks": [
+    {
+      "pick": "Florida A&M Rattlers -102",
+      "game": "Alabama A&M Bulldogs at Florida A&M Rattlers",
+      "sport": "NCAAB",
+      "odds": -102,
+      "units": 3,
+      "confidence": "high",
+      "ev": 0.049509803921568674,
+      "commenceTime": "2026-02-20T01:30:00Z",
+      "analysis": "Florida A&M Rattlers at home. Market implies 50.5% but estimated 53.0% gives 5.0% EV."
+    },
+    {
+      "pick": "Northeastern Huskies -108",
+      "game": "Drexel Dragons at Northeastern Huskies",
+      "sport": "NCAAB",
+      "odds": -108,
+      "units": 3,
+      "confidence": "high",
+      "ev": 0.04814814814814827,
+      "commenceTime": "2026-02-20T00:00:00Z",
+      "analysis": "Northeastern Huskies at home. Market implies 51.9% but estimated 54.4% gives 4.8% EV."
+    },
+    {
+      "pick": "Georgia St Panthers -115",
+      "game": "Georgia Southern Eagles at Georgia St Panthers",
+      "sport": "NCAAB",
+      "odds": -115,
+      "units": 3,
+      "confidence": "high",
+      "ev": 0.04673913043478256,
+      "commenceTime": "2026-02-20T01:00:00Z",
+      "analysis": "Georgia St Panthers at home. Market implies 53.5% but estimated 56.0% gives 4.7% EV."
+    },
+    {
+      "pick": "Weber State Wildcats -115",
+      "game": "Montana St Bobcats at Weber State Wildcats",
+      "sport": "NCAAB",
+      "odds": -115,
+      "units": 3,
+      "confidence": "high",
+      "ev": 0.04673913043478256,
+      "commenceTime": "2026-02-20T02:00:00Z",
+      "analysis": "Weber State Wildcats at home. Market implies 53.5% but estimated 56.0% gives 4.7% EV."
+    },
+    {
+      "pick": "Aston Villa -115",
+      "game": "Leeds United at Aston Villa",
+      "sport": "EPL",
+      "odds": -115,
+      "units": 3,
+      "confidence": "high",
+      "ev": 0.04673913043478256,
+      "commenceTime": "2026-02-21T15:00:00Z",
+      "analysis": "Aston Villa at home. Market implies 53.5% but estimated 56.0% gives 4.7% EV."
+    }
+  ],
+  "timestamp": "2026-02-19T17:47:49.066Z",
+  "sportsChecked": [
+    "NBA",
+    "NHL",
+    "NCAAB",
+    "NFL",
+    "EPL",
+    "Tennis ATP"
+  ],
+  "totalGames": 78,
+  "nextUpdate": "10:00 AM ET or 5:00 PM ET"
+}
