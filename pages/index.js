@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Nav from '../components/Nav';
+import { getTrackedSports, getSportsScheduleInfo } from '../lib/oddsApi';
 
 export default function DailyPicks() {
   const [picks, setPicks] = useState([]);
@@ -8,12 +9,16 @@ export default function DailyPicks() {
   const [bankroll, setBankroll] = useState(1000);
   const [unitSize, setUnitSize] = useState(50);
   const [sportsChecked, setSportsChecked] = useState([]);
+  const [trackedSports, setTrackedSports] = useState([]);
 
   useEffect(() => {
     const savedBankroll = localStorage.getItem('bankroll');
     const savedUnit = localStorage.getItem('unitSize');
     if (savedBankroll) setBankroll(parseFloat(savedBankroll));
     if (savedUnit) setUnitSize(parseFloat(savedUnit));
+    
+    // Set tracked sports for display
+    setTrackedSports(getTrackedSports());
     
     loadPicks();
   }, []);
@@ -80,7 +85,7 @@ export default function DailyPicks() {
 
       <Nav />
 
-      {/* API Info */}
+      {/* API Info & Tracked Sports */}
       <div style={{ 
         background: '#e8f5e9', 
         padding: '15px', 
@@ -90,6 +95,18 @@ export default function DailyPicks() {
       }}>
         <strong>✅ System Optimized:</strong> Fetches 8 sports × 2× daily = ~480 API calls/month (within 500 free tier limit). 
         Data refreshes automatically at 10:00 AM and 5:00 PM ET.
+        
+        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #c8e6c9' }}>
+          <strong>Currently Tracking ({trackedSports.length} sports):</strong>{' '}
+          {trackedSports.map((s, i) => (
+            <span key={s.key}>
+              {s.name}{i < trackedSports.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+        </div>
+        <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#666' }}>
+          Sports rotate based on season. Priority: NBA, NHL, NCAAB, Soccer, Tennis, MLB, Football (when active), with alternates filling gaps.
+        </p>
       </div>
 
       {/* Bankroll */}
