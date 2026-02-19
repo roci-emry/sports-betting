@@ -6,8 +6,8 @@ export default function DailyPicks() {
   const [picks, setPicks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [bankroll, setBankroll] = useState(1000);
-  const [unitSize, setUnitSize] = useState(50);
+  const [bankroll, setBankroll] = useState(100);
+  const [unitSize, setUnitSize] = useState(5);
   const [sportsChecked, setSportsChecked] = useState([]);
   const [trackedSports, setTrackedSports] = useState([]);
 
