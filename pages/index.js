@@ -7,13 +7,47 @@ export default function DailyPicks() {
   const [bankroll, setBankroll] = useState(1000);
   const [unitSize, setUnitSize] = useState(50);
 
+  // Sample picks for demonstration
+  const samplePicks = [
+    {
+      pick: "Boston Celtics -6.5",
+      game: "Celtics vs Heat",
+      odds: -110,
+      units: 2,
+      confidence: "medium",
+      analysis: "Celtics coming off rest, Heat on back-to-back. Boston's defense should limit Miami's perimeter shooting. Line moved from -5.5 to -6.5 with sharp action on Boston.",
+      myLine: "Celtics -7",
+      marketLine: "Celtics -6.5 (-110)",
+      publicPercent: 65
+    },
+    {
+      pick: "Over 228.5",
+      game: "Suns vs Warriors",
+      odds: -105,
+      units: 1,
+      confidence: "low",
+      analysis: "Both teams play fast, poor defense lately. Suns without key defender. Public heavily on under which has pushed total down from 232. Value on over.",
+      myLine: "230",
+      marketLine: "228.5 (-105)",
+      publicPercent: 72
+    }
+  ];
+
   useEffect(() => {
     const savedPicks = localStorage.getItem('dailyPicks');
     const savedUpdated = localStorage.getItem('lastUpdated');
     const savedBankroll = localStorage.getItem('bankroll');
     const savedUnit = localStorage.getItem('unitSize');
     
-    if (savedPicks) setPicks(JSON.parse(savedPicks));
+    if (savedPicks) {
+      setPicks(JSON.parse(savedPicks));
+    } else {
+      // Load sample picks on first visit
+      setPicks(samplePicks);
+      setLastUpdated(new Date().toISOString());
+      localStorage.setItem('dailyPicks', JSON.stringify(samplePicks));
+      localStorage.setItem('lastUpdated', new Date().toISOString());
+    }
     if (savedUpdated) setLastUpdated(savedUpdated);
     if (savedBankroll) setBankroll(parseFloat(savedBankroll));
     if (savedUnit) setUnitSize(parseFloat(savedUnit));
