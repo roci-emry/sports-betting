@@ -10,6 +10,8 @@ export default function DailyPicks() {
   const [unitSize, setUnitSize] = useState(5);
   const [sportsChecked, setSportsChecked] = useState([]);
   const [trackedSports, setTrackedSports] = useState([]);
+  const [addedPicks, setAddedPicks] = useState(new Set());
+  const [betsPlacedToday, setBetsPlacedToday] = useState(0);
 
   useEffect(() => {
     const savedBankroll = localStorage.getItem('bankroll');
@@ -19,7 +21,25 @@ export default function DailyPicks() {
     
     setTrackedSports(getTrackedSports());
     loadPicks();
+    checkExistingBets();
   }, []);
+
+  function checkExistingBets() {
+    const existingBets = JSON.parse(localStorage.getItem('bets') || '[]');
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Count bets placed today
+    const todayBets = existingBets.filter(bet => bet.date === today);
+    setBetsPlacedToday(todayBets.length);
+    
+    // Track which picks have been added
+    const added = new Set();
+    todayBets.forEach(bet => {
+      const key = `${bet.game}-${bet.pick}`;
+      added.add(key);
+    });
+    setAddedPicks(added);
+  }
 
   async function loadPicks() {
     setLoading(true);
@@ -97,7 +117,10 @@ export default function DailyPicks() {
     existing.unshift(bet);
     localStorage.setItem('bets', JSON.stringify(existing));
     
-    alert(`Added to tracker: ${pick.pick} - $${bet.betAmount}`);
+    // Update UI to show this pick is added
+    const key = `${pick.game}-${pick.pick}`;
+    setAddedPicks(prev => new Set([...prev, key]));
+    setBetsPlacedToday(prev => prev + 1);
   };
 
   return (
@@ -165,7 +188,7 @@ export default function DailyPicks() {
           { label: 'BANKROLL', value: `$${bankroll.toFixed(2)}`, color: '#00f3ff' },
           { label: 'UNIT SIZE', value: `$${unitSize}`, color: '#64ffda' },
           { label: 'TODAY\'S RISK', value: `$${totalRisk.toFixed(2)}`, color: totalRisk > unitSize * 3 ? '#e94560' : '#00f3ff' },
-          { label: 'ACTIVE PICKS', value: picks.length, color: '#bd34fe' },
+          { label: 'BETS PLACED', value: betsPlacedToday, color: '#bd34fe' },
         ].map((stat, i) => (
           <div key={i} style={{
             background: 'rgba(10, 25, 47, 0.7)',
@@ -288,12 +311,18 @@ export default function DailyPicks() {
           </h2>
           
           <div style={{ display: 'grid', gap: '20px' }}>
-            {picks.map((pick, i) => (
+            {picks.map((pick, i) => {
+              const isAdded = addedPicks.has(`${pick.game}-${pick.pick}`);
+              const cardBorderColor = isAdded ? '#00ff88' : confidenceColor(pick.confidence);
+              
+              return (
               <div key={i} style={{
-                background: 'linear-gradient(135deg, rgba(10, 25, 47, 0.9) 0%, rgba(17, 34, 64, 0.9) 100%)',
+                background: isAdded 
+                  ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.05) 0%, rgba(10, 25, 47, 0.9) 100%)'
+                  : 'linear-gradient(135deg, rgba(10, 25, 47, 0.9) 0%, rgba(17, 34, 64, 0.9) 100%)',
                 padding: '30px',
                 borderRadius: '20px',
-                border: `1px solid ${confidenceColor(pick.confidence)}40`,
+                border: `2px solid ${isAdded ? '#00ff88' : `${confidenceColor(pick.confidence)}40`}`,
                 position: 'relative',
                 overflow: 'hidden',
                 backdropFilter: 'blur(10px)'
@@ -305,8 +334,30 @@ export default function DailyPicks() {
                   left: 0,
                   right: 0,
                   height: '3px',
-                  background: `linear-gradient(90deg, ${confidenceColor(pick.confidence)}, transparent)`
+                  background: `linear-gradient(90deg, ${isAdded ? '#00ff88' : confidenceColor(pick.confidence)}, transparent)`
                 }} />
+                
+                {/* Added checkmark badge */}
+                {isAdded && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '15px',
+                    right: '15px',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                    color: '#0a0e27',
+                    fontWeight: 'bold',
+                    boxShadow: '0 0 20px rgba(0, 255, 136, 0.5)'
+                  }}>
+                    ✓
+                  </div>
+                )}
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                   <div>
@@ -385,11 +436,14 @@ export default function DailyPicks() {
                 </div>
                 
                 <button 
-                  onClick={() => addToTracker(pick)}
+                  onClick={() => !isAdded && addToTracker(pick)}
+                  disabled={isAdded}
                   style={{
                     width: '100%',
                     padding: '15px',
-                    background: 'linear-gradient(90deg, #00f3ff, #0066ff)',
+                    background: isAdded 
+                      ? 'linear-gradient(90deg, #00ff88, #00cc6a)' 
+                      : 'linear-gradient(90deg, #00f3ff, #0066ff)',
                     border: 'none',
                     borderRadius: '10px',
                     color: '#0a0e27',
@@ -397,21 +451,23 @@ export default function DailyPicks() {
                     fontWeight: '700',
                     fontFamily: 'monospace',
                     letterSpacing: '1px',
-                    cursor: 'pointer',
+                    cursor: isAdded ? 'default' : 'pointer',
                     textTransform: 'uppercase',
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.3s ease',
+                    opacity: isAdded ? 0.9 : 1
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.4)';
+                    if (!isAdded) e.target.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.4)';
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.boxShadow = 'none';
                   }}
                 >
-                  + Add to Tracker (${(pick.units * unitSize).toFixed(0)})
+                  {isAdded ? '✓ Added to Tracker' : `+ Add to Tracker ($${(pick.units * unitSize).toFixed(0)})`}
                 </button>
               </div>
-            ))}
+            );
+            })}
           </div>
         </>
       )}
