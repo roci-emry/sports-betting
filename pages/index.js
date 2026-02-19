@@ -1,23 +1,8 @@
 import { useState, useEffect } from 'react';
 import Nav from '../components/Nav';
+import { loadCachedPicks, fetchAndCacheAllSports, timeSinceUpdate, getActiveSports } from '../lib/oddsApi';
 
 const ODDS_API_KEY = '1ad6289c29935840d01c48d6e9438cb9';
-
-// Calculate implied probability from odds
-function impliedProbability(odds) {
-  if (odds > 0) {
-    return 100 / (odds + 100);
-  } else {
-    return Math.abs(odds) / (Math.abs(odds) + 100);
-  }
-}
-
-// Calculate expected value
-function calculateEV(trueProb, odds) {
-  const implied = impliedProbability(odds);
-  const winReturn = odds > 0 ? odds / 100 : 100 / Math.abs(odds);
-  return (trueProb * winReturn) - (1 - trueProb);
-}
 
 export default function DailyPicks() {
   const [picks, setPicks] = useState([]);
@@ -25,140 +10,68 @@ export default function DailyPicks() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [bankroll, setBankroll] = useState(1000);
   const [unitSize, setUnitSize] = useState(50);
-  const [error, setError] = useState(null);
+  const [apiCallsRemaining, setApiCallsRemaining] = useState(null);
+  const [sportsChecked, setSportsChecked] = useState([]);
+  const [manualFetchCount, setManualFetchCount] = useState(0);
 
   useEffect(() => {
     const savedBankroll = localStorage.getItem('bankroll');
     const savedUnit = localStorage.getItem('unitSize');
+    const savedFetchCount = localStorage.getItem('manualFetchCount');
+    
     if (savedBankroll) setBankroll(parseFloat(savedBankroll));
     if (savedUnit) setUnitSize(parseFloat(savedUnit));
+    if (savedFetchCount) setManualFetchCount(parseInt(savedFetchCount));
     
-    fetchPicks();
+    // Load cached picks on mount
+    loadPicks();
   }, []);
 
-  async function fetchPicks() {
+  function loadPicks() {
+    const cached = loadCachedPicks();
+    if (cached) {
+      setPicks(cached.picks);
+      setLastUpdated(cached.timestamp);
+      setSportsChecked(cached.sportsChecked || []);
+    } else {
+      // No cached data yet
+      setPicks([]);
+      setLastUpdated(null);
+    }
+    setLoading(false);
+  }
+
+  async function manualRefresh() {
+    // Warn about API usage
+    if (manualFetchCount >= 3) {
+      alert('Warning: You\'ve manually refreshed 3 times today. Each refresh uses API calls from your 500/month quota. The system auto-updates twice daily (10 AM and 5 PM).');
+    }
+    
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
+      const result = await fetchAndCacheAllSports(ODDS_API_KEY);
+      setPicks(result.picks);
+      setLastUpdated(result.timestamp);
+      setSportsChecked(result.sportsChecked);
       
-      // Fetch NBA odds
-      const response = await fetch(
-        `https://api.the-odds-api.com/v4/sports/basketball_nba/odds?apiKey=${ODDS_API_KEY}&regions=us&oddsFormat=american&bookmakers=draftkings`
-      );
-      
-      if (!response.ok) throw new Error('Failed to fetch odds');
-      
-      const games = await response.json();
-      const analyzedPicks = analyzeGames(games);
-      
-      setPicks(analyzedPicks);
-      setLastUpdated(new Date().toISOString());
+      // Track manual fetches
+      const newCount = manualFetchCount + 1;
+      setManualFetchCount(newCount);
+      localStorage.setItem('manualFetchCount', newCount.toString());
     } catch (e) {
-      setError(e.message);
-      // Load fallback picks
-      setPicks(getFallbackPicks());
-      setLastUpdated(new Date().toISOString());
+      console.error('Fetch error:', e);
+      alert('Failed to fetch fresh data. Using cached picks if available.');
     } finally {
       setLoading(false);
     }
   }
 
-  function analyzeGames(games) {
-    const allPicks = [];
-    
-    for (const game of games) {
-      const draftkings = game.bookmakers.find(b => b.key === 'draftkings');
-      if (!draftkings) continue;
-      
-      const h2h = draftkings.markets.find(m => m.key === 'h2h');
-      if (!h2h) continue;
-      
-      for (const outcome of h2h.outcomes) {
-        const implied = impliedProbability(outcome.price);
-        
-        // Basic analysis
-        let estimatedProb = implied;
-        let confidence = 'low';
-        let units = 1;
-        
-        const isHome = outcome.name === game.home_team;
-        const isFavorite = outcome.price < 0;
-        
-        // Apply simple adjustments
-        if (isHome && isFavorite) {
-          estimatedProb = Math.min(0.72, implied + 0.025);
-        } else if (!isHome && !isFavorite) {
-          estimatedProb = Math.max(0.22, implied - 0.015);
-        }
-        
-        const ev = calculateEV(estimatedProb, outcome.price);
-        
-        // Only include decent plays
-        if (ev > -0.03 && Math.abs(outcome.price) < 250) {
-          if (ev > 0.04) {
-            confidence = 'high';
-            units = 3;
-          } else if (ev > 0.01) {
-            confidence = 'medium';
-            units = 2;
-          }
-          
-          allPicks.push({
-            pick: `${outcome.name} ${outcome.price > 0 ? '+' : ''}${outcome.price}`,
-            game: `${game.away_team} at ${game.home_team}`,
-            sport: 'NBA',
-            odds: outcome.price,
-            units: units,
-            confidence: confidence,
-            ev: ev,
-            commenceTime: game.commence_time,
-            analysis: generateAnalysis(outcome.name, game, outcome.price, ev, isHome, implied, estimatedProb)
-          });
-        }
-      }
-    }
-    
-    // Sort by EV and return top 3
-    allPicks.sort((a, b) => b.ev - a.ev);
-    return allPicks.slice(0, 3);
-  }
-
-  function generateAnalysis(team, game, odds, ev, isHome, implied, estimated) {
-    const location = isHome ? 'at home' : 'on the road';
-    const evText = (ev * 100).toFixed(1);
-    
-    if (ev > 0.04) {
-      return `${team} ${location}. Market implies ${(implied*100).toFixed(1)}% win probability, but situational analysis suggests ${(estimated*100).toFixed(1)}%. Strong +${evText}% expected value makes this a top play.`;
-    } else if (ev > 0.01) {
-      return `${team} ${location} with modest edge. Market pricing at ${(implied*100).toFixed(1)}% vs. estimated ${(estimated*100).toFixed(1)}% gives +${evText}% EV. Solid value in a competitive matchup.`;
-    } else {
-      return `${team} ${location}. Near fair value with slight situational edge. Low confidence play for smaller stake.`;
-    }
-  }
-
-  function getFallbackPicks() {
-    return [
-      {
-        pick: "New York Knicks -180",
-        game: "Detroit Pistons at New York Knicks",
-        sport: "NBA",
-        odds: -180,
-        units: 3,
-        confidence: "high",
-        ev: 0.045,
-        analysis: "Knicks at home after All-Star break with OG Anunoby likely returning. Pistons missing key big men. Market may be undervaluing home court advantage and health disparities.",
-        isFallback: true
-      }
-    ];
-  }
-
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'Updating...';
+    if (!dateStr) return 'No data yet';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
+      weekday: 'short', 
+      month: 'short', 
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -166,21 +79,29 @@ export default function DailyPicks() {
   };
 
   const totalRisk = picks.reduce((sum, p) => sum + (p.units * unitSize), 0);
+  const activeSports = getActiveSports();
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
       <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <h1>📋 Roci's Daily Picks</h1>
-        <p style={{ color: '#666' }}>Automated analysis • {formatDate(lastUpdated)}</p>
+        <p style={{ color: '#666' }}>Auto-updates at 10 AM & 5 PM ET • {timeSinceUpdate(lastUpdated)}</p>
       </header>
 
       <Nav />
 
-      {error && (
-        <div style={{ background: '#ffebee', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-          <p style={{ margin: 0, color: '#d32f2f' }}>⚠️ {error} — Showing fallback analysis</p>
-        </div>
-      )}
+      {/* API Usage Warning */}
+      <div style={{ 
+        background: '#fff3e0', 
+        padding: '15px', 
+        borderRadius: '8px', 
+        marginBottom: '20px',
+        fontSize: '14px'
+      }}>
+        <strong>📊 API Usage:</strong> Free tier = 500 requests/month. 
+        System auto-fetches 8 sports × 2 times daily = ~480 requests/month. 
+        Manual refreshes count against quota (used {manualFetchCount} today).
+      </div>
 
       {/* Bankroll Status */}
       <div style={{ 
@@ -212,9 +133,21 @@ export default function DailyPicks() {
         </div>
       </div>
 
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+      {/* Sports Tracked */}
+      <div style={{ marginBottom: '20px' }}>
+        <p style={{ margin: '0 0 10px 0', color: '#666', fontSize: '14px' }}>
+          <strong>Tracking {activeSports.length} sports:</strong> {activeSports.map(s => s.name).join(', ')}
+        </p>
+        {sportsChecked.length > 0 && (
+          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
+            Last scan checked: {sportsChecked.join(', ')}
+          </p>
+        )}
+      </div>
+
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
         <button 
-          onClick={fetchPicks}
+          onClick={manualRefresh}
           disabled={loading}
           style={{
             padding: '10px 20px',
@@ -225,13 +158,16 @@ export default function DailyPicks() {
             cursor: loading ? 'not-allowed' : 'pointer'
           }}
         >
-          {loading ? 'Loading...' : '🔄 Refresh Odds'}
+          {loading ? 'Loading...' : '🔄 Manual Refresh'}
         </button>
+        <span style={{ color: '#666', fontSize: '12px' }}>
+          Auto-refreshes: 10:00 AM & 5:00 PM ET
+        </span>
       </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>
-          <p>Scanning DraftKings lines across all sports...</p>
+          <p>Analyzing lines across {activeSports.length} sports...</p>
           <p style={{ color: '#666', fontSize: '14px' }}>Calculating expected value and ranking plays</p>
         </div>
       ) : picks.length === 0 ? (
@@ -241,18 +177,18 @@ export default function DailyPicks() {
           borderRadius: '8px', 
           textAlign: 'center' 
         }}>
-          <h2>No +EV plays found today</h2>
+          <h2>No picks available</h2>
           <p style={{ color: '#666' }}>
-            The algorithm didn't find any bets with positive expected value today.<br/>
-            This is normal — we only bet when there's clear value.
+            The system updates automatically at 10 AM and 5 PM ET.<br/>
+            Check back after the next scheduled update, or click Manual Refresh.
           </p>
         </div>
       ) : (
         <>
           <div style={{ marginBottom: '20px' }}>
-            <h2>Today's Best Plays</h2>
+            <h2>Top Plays from {sportsChecked.length} Sports</h2>
             <p style={{ color: '#666', fontSize: '14px' }}>
-              Auto-generated from live DraftKings odds • Ranked by expected value
+              Auto-generated from DraftKings odds • Last updated: {formatDate(lastUpdated)}
             </p>
           </div>
 
@@ -277,7 +213,7 @@ export default function DailyPicks() {
                       color: pick.confidence === 'high' ? '#4caf50' : pick.confidence === 'medium' ? '#ff9800' : '#f44336',
                       marginBottom: '8px'
                     }}>
-                      {pick.sport} • {pick.confidence.toUpperCase()} CONFIDENCE
+                      #{i + 1} {pick.sport} • {pick.confidence.toUpperCase()} CONFIDENCE
                     </span>
                     <h3 style={{ margin: '0 0 5px 0' }}>{pick.pick}</h3>
                     <p style={{ margin: 0, color: '#666' }}>{pick.game}</p>
@@ -290,7 +226,7 @@ export default function DailyPicks() {
                     <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#999' }}>
                       ${(pick.units * unitSize).toFixed(0)}
                     </p>
-                    {pick.ev && (
+                    {pick.ev !== undefined && (
                       <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: pick.ev > 0 ? '#4caf50' : '#666' }}>
                         EV: {(pick.ev * 100).toFixed(1)}%
                       </p>
