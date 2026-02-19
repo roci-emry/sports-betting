@@ -7,29 +7,40 @@ export default function DailyPicks() {
   const [bankroll, setBankroll] = useState(1000);
   const [unitSize, setUnitSize] = useState(50);
 
-  // Sample picks for demonstration
-  const samplePicks = [
+  // Today's picks - February 19, 2025
+  const todaysPicks = [
     {
-      pick: "Boston Celtics -6.5",
-      game: "Celtics vs Heat",
+      pick: "New York Knicks -4.5",
+      game: "Detroit Pistons at New York Knicks",
+      odds: -108,
+      units: 3,
+      confidence: "high",
+      analysis: "BEST BET: Knicks at home after All-Star break, OG Anunoby likely returning. Pistons without Duren and Stewart (suspended). Knicks need this game to send message to East leaders. Public all over Pistons after 38-point blowout win on Feb 7, but value is on Knicks with home court and health advantage.",
+      myLine: "Knicks -6",
+      marketLine: "Knicks -4.5 (-108)",
+      publicPercent: 68
+    },
+    {
+      pick: "Boston Celtics -4.5",
+      game: "Boston Celtics at Golden State Warriors",
       odds: -110,
       units: 2,
       confidence: "medium",
-      analysis: "Celtics coming off rest, Heat on back-to-back. Boston's defense should limit Miami's perimeter shooting. Line moved from -5.5 to -6.5 with sharp action on Boston.",
-      myLine: "Celtics -7",
-      marketLine: "Celtics -6.5 (-110)",
-      publicPercent: 65
+      analysis: "Celtics road favorites against Warriors. Boston 17-10 on road, strong defense. Warriors 18-10 at home but Celtics are the class of the East. Line moved from -3.5 to -4.5 with sharp money on Boston. Good spot for Celtics to assert dominance.",
+      myLine: "Celtics -5",
+      marketLine: "Celtics -4.5 (-110)",
+      publicPercent: 62
     },
     {
-      pick: "Over 228.5",
-      game: "Suns vs Warriors",
-      odds: -105,
+      pick: "Under 222",
+      game: "Detroit Pistons at New York Knicks",
+      odds: -110,
       units: 1,
       confidence: "low",
-      analysis: "Both teams play fast, poor defense lately. Suns without key defender. Public heavily on under which has pushed total down from 232. Value on over.",
-      myLine: "230",
-      marketLine: "228.5 (-105)",
-      publicPercent: 72
+      analysis: "Contrarian total play. Public heavily on over after Pistons-Knicks went way over in last meeting. But Knicks are a defensive team at home, Pistons missing interior presence without Duren/Stewart. First game back after break often leads to rust and lower scoring.",
+      myLine: "219.5",
+      marketLine: "221.5 (-110)",
+      publicPercent: 75
     }
   ];
 
@@ -42,10 +53,10 @@ export default function DailyPicks() {
     if (savedPicks) {
       setPicks(JSON.parse(savedPicks));
     } else {
-      // Load sample picks on first visit
-      setPicks(samplePicks);
+      // Load today's picks on first visit
+      setPicks(todaysPicks);
       setLastUpdated(new Date().toISOString());
-      localStorage.setItem('dailyPicks', JSON.stringify(samplePicks));
+      localStorage.setItem('dailyPicks', JSON.stringify(todaysPicks));
       localStorage.setItem('lastUpdated', new Date().toISOString());
     }
     if (savedUpdated) setLastUpdated(savedUpdated);
