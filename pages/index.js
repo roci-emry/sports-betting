@@ -81,16 +81,37 @@ export default function DailyPicks() {
     return '#e94560';
   };
 
+  const addToTracker = (pick) => {
+    const bet = {
+      id: Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      sport: pick.sport,
+      game: pick.game,
+      pick: pick.pick,
+      odds: pick.odds,
+      betAmount: (pick.units * unitSize).toFixed(2),
+      result: 'pending'
+    };
+    
+    const existing = JSON.parse(localStorage.getItem('bets') || '[]');
+    existing.unshift(bet);
+    localStorage.setItem('bets', JSON.stringify(existing));
+    
+    alert(`Added to tracker: ${pick.pick} - $${bet.betAmount}`);
+  };
+
   return (
     <div style={{
       fontFamily: 'system-ui, -apple-system, sans-serif',
-      maxWidth: '1000px',
-      margin: '0 auto',
-      padding: '40px 20px',
       background: '#0a0e27',
       minHeight: '100vh',
       color: '#ccd6f6'
     }}>
+      <div style={{
+        maxWidth: '1000px',
+        margin: '0 auto',
+        padding: '40px 20px'
+      }}>
       <header style={{ 
         borderBottom: '1px solid rgba(0, 243, 255, 0.2)',
         paddingBottom: '30px',
@@ -355,12 +376,40 @@ export default function DailyPicks() {
                   background: 'rgba(0, 0, 0, 0.3)',
                   padding: '20px',
                   borderRadius: '12px',
-                  border: '1px solid rgba(0, 243, 255, 0.1)'
+                  border: '1px solid rgba(0, 243, 255, 0.1)',
+                  marginBottom: '20px'
                 }}>
                   <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.7', color: '#a8b2d1' }}>
                     {pick.analysis}
                   </p>
                 </div>
+                
+                <button 
+                  onClick={() => addToTracker(pick)}
+                  style={{
+                    width: '100%',
+                    padding: '15px',
+                    background: 'linear-gradient(90deg, #00f3ff, #0066ff)',
+                    border: 'none',
+                    borderRadius: '10px',
+                    color: '#0a0e27',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    fontFamily: 'monospace',
+                    letterSpacing: '1px',
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  + Add to Tracker (${(pick.units * unitSize).toFixed(0)})
+                </button>
               </div>
             ))}
           </div>
@@ -403,6 +452,7 @@ export default function DailyPicks() {
           Automated EV Analysis via The Odds API • Not Financial Advice
         </p>
       </footer>
+      </div>
     </div>
   );
 }
